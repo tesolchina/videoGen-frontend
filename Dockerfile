@@ -23,4 +23,4 @@ RUN npm install -g serve
 EXPOSE $PORT
 
 # Start the application
-CMD ["sh", "-c", "serve -s dist -l ${PORT:-4173}"]
+CMD ["sh", "-c", "serve -s dist -l ${PORT:-3001}"]
