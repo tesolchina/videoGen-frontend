@@ -11,21 +11,12 @@ export default defineConfig({
   },
   server: {
     port: 3001,
-    host: true,
-    allowedHosts: [
-      'videoaigen.hkbu.tech',
-      'localhost',
-      '127.0.0.1',
-      '0.0.0.0'
-    ]
+    host: '0.0.0.0',
+    allowedHosts: 'all'
   },
   preview: {
-    allowedHosts: [
-      'videoaigen.hkbu.tech',
-      'localhost',
-      '127.0.0.1',
-      '0.0.0.0'
-    ]
+    host: '0.0.0.0',
+    allowedHosts: 'all'
   },
   build: {
     outDir: 'dist',
