@@ -52,6 +52,57 @@ export const videoService = {
     } catch (error) {
       throw new Error(`Failed to get job status: ${error.message}`)
     }
+  },
+
+  // Vimeo integration methods
+  async uploadToVimeo(videoPath, metadata = {}) {
+    try {
+      const response = await apiClient.post('/api/video/upload-to-vimeo', {
+        videoPath,
+        metadata
+      })
+      return response.data
+    } catch (error) {
+      throw new Error(`Vimeo upload failed: ${error.message}`)
+    }
+  },
+
+  async getVimeoStatus() {
+    try {
+      const response = await apiClient.get('/api/video/vimeo/status')
+      return response.data
+    } catch (error) {
+      throw new Error(`Failed to get Vimeo status: ${error.message}`)
+    }
+  },
+
+  async getVimeoVideoDetails(videoId) {
+    try {
+      const response = await apiClient.get(`/api/video/vimeo/video/${videoId}`)
+      return response.data
+    } catch (error) {
+      throw new Error(`Failed to get Vimeo video details: ${error.message}`)
+    }
+  },
+
+  async updateVimeoVideoMetadata(videoId, metadata) {
+    try {
+      const response = await apiClient.patch(`/api/video/vimeo/video/${videoId}`, {
+        metadata
+      })
+      return response.data
+    } catch (error) {
+      throw new Error(`Failed to update Vimeo video metadata: ${error.message}`)
+    }
+  },
+
+  async deleteVimeoVideo(videoId) {
+    try {
+      const response = await apiClient.delete(`/api/video/vimeo/video/${videoId}`)
+      return response.data
+    } catch (error) {
+      throw new Error(`Failed to delete Vimeo video: ${error.message}`)
+    }
   }
 }
 

@@ -268,6 +268,111 @@
               >
                 🔍 Fullscreen
               </button>
+              <button
+                @click="showVimeoUpload = true"
+                :disabled="isUploadingToVimeo"
+                class="py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              >
+                📤 Upload to Vimeo
+              </button>
+            </div>
+
+            <!-- Vimeo Upload Modal -->
+            <div v-if="showVimeoUpload" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-lg font-semibold mb-4">Upload to Vimeo</h3>
+                
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                      Video Title
+                    </label>
+                    <input
+                      v-model="vimeoMetadata.title"
+                      type="text"
+                      class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                      placeholder="My Generated Video"
+                    />
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      v-model="vimeoMetadata.description"
+                      class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500 h-20 resize-none"
+                      placeholder="Video description..."
+                    />
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                      Privacy
+                    </label>
+                    <select
+                      v-model="vimeoMetadata.privacy.view"
+                      class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="anybody">Public - Anyone can view</option>
+                      <option value="unlisted">Unlisted - Anyone with link can view</option>
+                      <option value="nobody">Private - Only you can view</option>
+                      <option value="contacts">Contacts - Only your contacts can view</option>
+                    </select>
+                  </div>
+
+                  <div class="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="allowDownload"
+                      v-model="vimeoMetadata.privacy.download"
+                      class="rounded focus:ring-purple-500"
+                    />
+                    <label for="allowDownload" class="text-sm text-gray-700">
+                      Allow download
+                    </label>
+                  </div>
+                </div>
+
+                <div v-if="uploadProgress" class="mt-4">
+                  <div class="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>Uploading to Vimeo...</span>
+                    <span>{{ uploadProgress }}%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      class="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                      :style="{ width: `${uploadProgress}%` }"
+                    />
+                  </div>
+                </div>
+
+                <div v-if="vimeoUploadResult" class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div class="text-green-800 font-medium">✅ Upload Successful!</div>
+                  <div class="text-sm text-green-600 mt-1">
+                    <a :href="vimeoUploadResult.video.link" target="_blank" class="underline">
+                      View on Vimeo
+                    </a>
+                  </div>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                  <button
+                    @click="uploadToVimeo"
+                    :disabled="isUploadingToVimeo || !vimeoMetadata.title"
+                    class="flex-1 py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                  >
+                    {{ isUploadingToVimeo ? 'Uploading...' : 'Upload' }}
+                  </button>
+                  <button
+                    @click="closeVimeoModal"
+                    :disabled="isUploadingToVimeo"
+                    class="py-2 px-4 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 disabled:opacity-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -279,6 +384,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useVideoStore } from '@/stores/videoStore'
+import { videoService } from '@/services/videoService'
 
 const videoStore = useVideoStore()
 const previewCanvas = ref(null)
@@ -286,6 +392,20 @@ const audioDuration = ref(0)
 const videoDuration = ref(0)
 const audioSize = ref('')
 const resolution = ref('720p')
+
+// Vimeo upload variables
+const showVimeoUpload = ref(false)
+const isUploadingToVimeo = ref(false)
+const uploadProgress = ref(0)
+const vimeoUploadResult = ref(null)
+const vimeoMetadata = ref({
+  title: '',
+  description: '',
+  privacy: {
+    view: 'anybody',
+    download: false
+  }
+})
 
 const progressLabel = computed(() => {
   if (videoStore.progress <= 30) return 'Preparing...'
@@ -569,6 +689,83 @@ function drawPreview() {
 // Watch for changes and update preview
 watch(() => videoStore.settings, drawPreview, { deep: true })
 watch(() => videoStore.bullets, drawPreview, { deep: true })
+
+// Vimeo upload methods
+async function uploadToVimeo() {
+  if (!vimeoMetadata.value.title) {
+    alert('Please enter a video title')
+    return
+  }
+
+  try {
+    isUploadingToVimeo.value = true
+    uploadProgress.value = 0
+    vimeoUploadResult.value = null
+
+    // Get the video file path from the video URL
+    const videoPath = videoStore.videoUrl.split('/').pop()
+    
+    const response = await videoService.uploadToVimeo(videoPath, vimeoMetadata.value)
+    
+    // Poll for upload status
+    const jobId = response.jobId
+    await pollJobStatus(jobId, (progress) => {
+      uploadProgress.value = progress
+    })
+
+  } catch (error) {
+    console.error('Vimeo upload error:', error)
+    alert(`Upload failed: ${error.message}`)
+  } finally {
+    isUploadingToVimeo.value = false
+  }
+}
+
+async function pollJobStatus(jobId, onProgress) {
+  const maxAttempts = 60 // 5 minutes max
+  let attempts = 0
+
+  const poll = async () => {
+    try {
+      const status = await videoService.getJobStatus(jobId)
+      
+      if (status.progress) {
+        onProgress(status.progress)
+      }
+
+      if (status.status === 'completed') {
+        vimeoUploadResult.value = status.result
+        return
+      } else if (status.status === 'failed') {
+        throw new Error(status.error?.message || 'Upload failed')
+      } else if (attempts < maxAttempts) {
+        attempts++
+        setTimeout(poll, 5000) // Poll every 5 seconds
+      } else {
+        throw new Error('Upload timeout')
+      }
+    } catch (error) {
+      throw error
+    }
+  }
+
+  await poll()
+}
+
+function closeVimeoModal() {
+  showVimeoUpload.value = false
+  uploadProgress.value = 0
+  vimeoUploadResult.value = null
+  // Reset metadata
+  vimeoMetadata.value = {
+    title: '',
+    description: '',
+    privacy: {
+      view: 'anybody',
+      download: false
+    }
+  }
+}
 
 onMounted(() => {
   // Set default script
